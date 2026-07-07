@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SyncView — Lecteur vidéo synchronisé</title>
+<style>
+:root{
+  --bg:#070b16;--panel:#111827ee;--panel2:#1f2937;--line:#334155;--text:#f8fafc;
+  --muted:#9ca3af;--yellow:#facc15;--orange:#fb923c;--green:#4ade80;--red:#fb7185;
+  --dock:170px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:
+    radial-gradient(circle at 15% 0%,#facc1522,transparent 32%),
+    radial-gradient(circle at 90% 0%,#60a5fa22,transparent 30%),
+    linear-gradient(180deg,#070b16,#0f172a);
+}
+button,input,select{font:inherit}
+button{
+  border:1px solid var(--line);background:#ffffff12;color:var(--text);
+  border-radius:14px;padding:10px 14px;min-height:42px;cursor:pointer;
+  display:inline-flex;gap:8px;align-items:center;justify-content:center;
+}
+button:hover{border-color:var(--yellow);background:#ffffff1f}
+button.primary{background:linear-gradient(135deg,var(--yellow),var(--orange));color:#1b1300;font-weight:900}
+button.icon{width:44px;padding:0}
+input,select{
+  width:100%;border:1px solid var(--line);background:#ffffff12;color:var(--text);
+  border-radius:14px;padding:10px 12px;min-height:42px;outline:none;
+}
+input[type=file]{border-style:dashed}
+input[type=range]{accent-color:var(--yellow)}
+label{display:grid;gap:7px;color:var(--muted);font-size:.9rem}
+.top{
+  position:sticky;top:0;z-index:20;padding:14px 18px;border-bottom:1px solid var(--line);
+  background:#070b16cc;backdrop-filter:blur(14px);
+  display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+}
+h1{font-size:clamp(1.1rem,2.4vw,1.6rem);margin:0;letter-spacing:-.04em}
+.sub{color:var(--muted);font-size:.88rem;margin-top:3px}
+.actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.pill{
+  border:1px solid var(--line);border-radius:999px;background:#ffffff10;color:var(--muted);
+  padding:9px 12px;display:inline-flex;gap:7px;align-items:center;white-space:nowrap;font-size:.88rem
+}
+.pill.good{color:var(--green);border-color:#4ade8060}.pill.bad{color:var(--red);border-color:#fb718560}
+main{width:min(1900px,100%);margin:auto;padding:14px 18px calc(var(--dock) + 26px);display:grid;gap:14px}
+.setup{
+  border:1px solid var(--line);border-radius:22px;background:var(--panel);padding:14px;
+  display:grid;grid-template-columns:minmax(260px,1fr) 170px 210px;gap:12px;align-items:end
+}
+.grid{display:grid;gap:14px;min-height:52vh}
+.grid.auto{grid-template-columns:repeat(auto-fit,minmax(min(560px,100%),1fr))}
+.grid.one{grid-template-columns:1fr}.grid.one .slot.b{display:none}
+.grid.side{grid-template-columns:1fr 1fr}
+.grid.stack{grid-template-columns:1fr}
+.slot{
+  border:1px solid var(--line);border-radius:22px;background:var(--panel);overflow:hidden;
+  display:grid;grid-template-rows:auto minmax(260px,1fr) auto;min-width:0
+}
+.head{
+  padding:12px;border-bottom:1px solid var(--line);display:grid;
+  grid-template-columns:1fr 110px auto auto;gap:10px;align-items:end
+}
+.title{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800;margin-bottom:5px}
+.wrap{background:#000;min-height:clamp(260px,48vh,760px);position:relative;display:grid;place-items:center}
+.stack .wrap{min-height:clamp(230px,36vh,480px)}
+video{width:100%;height:100%;object-fit:contain;background:#000;max-height:calc(100vh - 330px)}
+.stack video{max-height:42vh}
+.placeholder{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--muted);
+  background:radial-gradient(circle at 50% 40%,#facc151c,transparent 35%)
+}
+.placeholder strong{display:block;color:var(--text);font-size:1.05rem;margin-bottom:5px}
+.badge{
+  position:absolute;left:12px;top:12px;border:1px solid #ffffff22;background:#0009;backdrop-filter:blur(8px);
+  border-radius:999px;padding:7px 10px;color:#fff;font-size:.82rem
+}
+.foot{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:8px}
+.mini{height:6px;background:#ffffff14;border-radius:999px;overflow:hidden}.mini span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.meta{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.86rem}.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock{
+  position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:30;
+  width:min(1220px,calc(100% - 20px));border:1px solid var(--line);border-radius:24px;
+  background:#0f172adb;backdrop-filter:blur(18px);padding:12px;display:grid;gap:10px;
+  box-shadow:0 25px 90px #0008
+}
+.clockrow{display:grid;grid-template-columns:180px 1fr 95px;gap:12px;align-items:center}
+.clock{font-variant-numeric:tabular-nums;font-size:clamp(1.3rem,3.2vw,2rem);font-weight:950;letter-spacing:-.06em}
+.clock small{display:block;color:var(--muted);font-size:.65rem;letter-spacing:0;text-transform:uppercase}
+.progress{
+  appearance:none;width:100%;height:10px;border-radius:999px;
+  background:linear-gradient(90deg,var(--yellow) var(--p,0%),#ffffff20 var(--p,0%));
+}
+.progress::-webkit-slider-thumb{appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:4px solid var(--yellow)}
+.labels{display:flex;justify-content:space-between;color:#6b7280;font-size:.75rem;margin-top:5px;font-variant-numeric:tabular-nums}
+.controls{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.left,.center,.right{display:flex;gap:8px;flex-wrap:wrap}.center{justify-content:center}.right{justify-content:flex-end}
+dialog{
+  width:min(900px,calc(100% - 24px));max-height:calc(100vh - 36px);border:1px solid var(--line);
+  border-radius:24px;background:#101827;color:var(--text);padding:0;box-shadow:0 30px 120px #000a;overflow:hidden
+}
+dialog::backdrop{background:#000a;backdrop-filter:blur(5px)}
+.modalhead{padding:16px 18px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:12px}
+.modalhead h2{margin:0;font-size:1.15rem}.modalhead p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+.modalbody{padding:16px 18px;overflow:auto;max-height:calc(100vh - 120px);display:grid;gap:12px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{border:1px solid var(--line);border-radius:18px;background:#ffffff0b;padding:13px;display:grid;gap:11px}
+.card h3{margin:0;font-size:.96rem}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btngrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.note{color:var(--muted);font-size:.88rem;line-height:1.4;margin:0}
+.toast{position:fixed;right:18px;bottom:calc(var(--dock) + 30px);z-index:50;background:#0f172aee;border:1px solid #facc1555;border-radius:16px;padding:12px 14px;opacity:0;transform:translateY(12px);transition:.18s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+@media(max-width:1180px){
+  :root{--dock:220px}.top{grid-template-columns:1fr}.actions{justify-content:flex-start}
+  .setup,.grid.side,.controls{grid-template-columns:1fr}.head{grid-template-columns:1fr 110px auto auto}
+  .left,.right{justify-content:center}
+}
+@media(max-width:760px){
+  :root{--dock:265px}main{padding-inline:10px}.sub{display:none}.setup,.head,.clockrow,.cards,.twocol,.btngrid{grid-template-columns:1fr}
+  .clock{text-align:center}.controls button .txt{display:none}.dock{width:calc(100% - 14px);border-radius:20px}
+}
+
+.quickbar{
+  position:fixed;
+  right:14px;
+  top:82px;
+  z-index:60;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  max-width:min(520px,calc(100% - 28px));
+}
+.quickbar button{
+  min-height:38px;
+  padding:8px 11px;
+  border-radius:999px;
+  background:#0f172add;
+  backdrop-filter:blur(14px);
+  box-shadow:0 12px 34px #0005;
+  font-size:.86rem;
+}
+body.hide-header .top{display:none}
+body.hide-loader .setup{display:none}
+body.hide-dock .dock{display:none}
+body.hide-dock{--dock:0px}
+body.hide-header .quickbar{top:14px}
+body.focus-mode .top,
+body.focus-mode .setup,
+body.focus-mode .dock{display:none}
+body.focus-mode{--dock:0px}
+body.focus-mode main{padding-top:14px;padding-bottom:14px}
+body.focus-mode .quickbar{top:14px;opacity:.32;transition:opacity .15s ease}
+body.focus-mode .quickbar:hover{opacity:1}
+body.focus-mode .head,
+body.focus-mode .foot{display:none}
+body.focus-mode .slot{grid-template-rows:minmax(280px,1fr)}
+body.focus-mode .wrap{min-height:calc(100vh - 28px)}
+body.focus-mode video{max-height:calc(100vh - 28px)}
+body.hide-loader main{padding-top:14px}
+body.hide-dock main{padding-bottom:14px}
+body.hide-header.hide-dock.hide-loader main{padding:14px 18px}
+@media(max-width:760px){
+  .quickbar{
+    left:8px;
+    right:8px;
+    top:auto;
+    bottom:calc(var(--dock) + 12px);
+    justify-content:center;
+  }
+  body.hide-dock .quickbar,
+  body.focus-mode .quickbar{
+    bottom:10px;
+    top:auto;
+  }
+  .quickbar button .wide-label{display:none}
+}
+
+
+/* Focus v2 : les panneaux peuvent réapparaître par-dessus les vidéos */
+body.focus-mode.focus-show-loader .setup{
+  display:grid !important;
+  position:fixed;
+  z-index:58;
+  left:14px;
+  right:14px;
+  top:68px;
+  width:min(1060px, calc(100% - 28px));
+  margin:0 auto;
+  box-shadow:0 25px 90px #000a;
+  background:#111827f2;
+  backdrop-filter:blur(18px);
+}
+body.focus-mode.focus-show-dock .dock{
+  display:grid !important;
+}
+body.focus-mode.focus-show-dock{
+  --dock:170px;
+}
+body.focus-mode.focus-show-loader.focus-show-dock{
+  --dock:170px;
+}
+body.focus-mode.focus-show-loader .quickbar{
+  opacity:1;
+}
+body.focus-mode.focus-show-dock .quickbar{
+  opacity:1;
+}
+body.focus-mode.focus-show-loader .wrap{
+  min-height:calc(100vh - 28px);
+}
+body.focus-mode .quickbar button{
+  border-color:#facc1544;
+}
+body.focus-mode.focus-show-loader #toggleLoader,
+body.focus-mode.focus-show-dock #toggleDock{
+  background:linear-gradient(135deg,#facc15,#fb923c);
+  color:#1b1300;
+  font-weight:900;
+}
+@media(max-width:760px){
+  body.focus-mode.focus-show-loader .setup{
+    top:10px;
+    bottom:auto;
+    left:8px;
+    right:8px;
+    width:calc(100% - 16px);
+  }
+  body.focus-mode.focus-show-loader .quickbar{
+    bottom:10px;
+  }
+  body.focus-mode.focus-show-dock{
+    --dock:265px;
+  }
+}
+
+
+.switch-panel{
+  grid-column:1/-1;
+  border-top:1px solid var(--line);
+  padding-top:12px;
+  display:grid;
+  gap:10px;
+}
+.switch-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  color:var(--muted);
+  font-size:.9rem;
+}
+.switch-head strong{
+  color:var(--text);
+}
+.switch-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:8px;
+}
+.switch-item{
+  border:1px solid var(--line);
+  background:#ffffff0c;
+  border-radius:16px;
+  padding:9px;
+  display:grid;
+  grid-template-columns:1fr auto auto;
+  gap:8px;
+  align-items:center;
+  min-width:0;
+}
+.switch-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--text);
+  font-size:.88rem;
+}
+.switch-item button{
+  min-height:34px;
+  padding:7px 10px;
+  border-radius:999px;
+  font-size:.82rem;
+}
+.switch-empty{
+  color:var(--muted);
+  font-size:.9rem;
+}
+body.focus-mode.focus-show-loader .setup{
+  max-height:calc(100vh - 92px);
+  overflow:auto;
+}
+@media(max-width:760px){
+  .switch-item{
+    grid-template-columns:1fr;
+  }
+  .switch-item button{
+    width:100%;
+  }
+}
+
+
+.help-list{
+  display:grid;
+  gap:8px;
+}
+.help-row{
+  display:grid;
+  grid-template-columns:minmax(120px,.5fr) 1fr;
+  gap:10px;
+  align-items:center;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:9px 10px;
+  background:#ffffff08;
+}
+.help-keys{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.key{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:3px 8px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  border-bottom-width:2px;
+  background:#02061799;
+  color:var(--text);
+  font-weight:800;
+  font-size:.82rem;
+  font-variant-numeric:tabular-nums;
+}
+.sync-flash{
+  animation:syncPulse .42s ease;
+}
+@keyframes syncPulse{
+  0%{filter:brightness(1.8)}
+  100%{filter:brightness(1)}
+}
+@media(max-width:760px){
+  .help-row{
+    grid-template-columns:1fr;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<div class="quickbar" id="quickbar">
+  <button id="toggleHeader" type="button" title="Afficher / masquer le header">🏷️ <span class="wide-label">Header</span></button>
+  <button id="toggleLoader" type="button" title="Afficher / masquer le chargement des vidéos">📁 <span class="wide-label">Charger</span></button>
+  <button id="toggleDock" type="button" title="Afficher / masquer l’horloge et les contrôles">🕒 <span class="wide-label">Lecteur</span></button>
+  <button id="focusMode" class="primary" type="button" title="Mode focus : vidéos seules">🎬 <span class="wide-label">Focus</span></button>
+  <button id="helpQuickBtn" type="button" title="Aide et raccourcis clavier">❔ <span class="wide-label">Aide</span></button>
+</div>
+
+<header class="top">
+  <div>
+    <h1>🎬 SyncView — lecteur vidéo synchronisé</h1>
+    <div class="sub">1 ou 2 vidéos par onglet · double écran · changement de vidéo sans perdre la synchro</div>
+  </div>
+  <div class="actions">
+    <span id="status" class="pill good">🔄 Synchro prête</span>
+    <button id="syncBtn" class="primary">⚙️ Synchro</button>
+    <button id="helpBtn">❔ Aide</button>
+    <button id="tabBtn">🖥️ 2e onglet</button>
+    <button id="fullAppBtn">⛶ Plein écran</button>
+  </div>
+</header>
+
+<main>
+  <section class="setup">
+    <label><span class="title">📁 Charger les vidéos</span><input id="files" type="file" accept="video/*" multiple></label>
+    <label><span class="title">🔄 Salle</span><input id="room" value="session-1"></label>
+    <label><span class="title">🧩 Affichage</span>
+      <select id="layout">
+        <option value="auto" selected>Auto adaptatif</option>
+        <option value="one">1 vidéo</option>
+        <option value="side">2 vidéos côte à côte</option>
+        <option value="stack">2 vidéos haut / bas</option>
+      </select>
+    </label>
+
+    <div id="switchPanel" class="switch-panel">
+      <div class="switch-head">
+        <strong>🎛️ Switch rapide des vues</strong>
+        <span>Charge tes vidéos, puis envoie instantanément une vidéo à gauche ou à droite.</span>
+      </div>
+      <div id="switchList" class="switch-list">
+        <span class="switch-empty">Aucune vidéo chargée.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="grid" class="grid auto">
+    <article class="slot a">
+      <div class="head">
+        <label><span class="title">🎥 Vidéo A</span><select id="sel0"><option>Charge tes vidéos…</option></select></label>
+        <label><span class="title">Offset s</span><input id="off0" type="number" step="0.05" value="0"></label>
+        <button id="mute0">🔊 Son</button><button id="fs0" class="icon">⛶</button>
+      </div>
+      <div class="wrap" id="wrap0">
+        <video id="v0" playsinline preload="metadata"></video>
+        <div id="ph0" class="placeholder"><div><strong>Vidéo A</strong>Charge les fichiers puis choisis une vidéo.</div></div>
+        <div id="badge0" class="badge">🕒 00:00:00.000</div>
+      </div>
+      <div class="foot"><div class="mini"><span id="mini0"></span></div><div class="meta"><span id="name0" class="name">Aucune vidéo</span><span id="time0">00:00:00.000 / 00:00:00.000</span></div></div>
+    </article>
+
+    <article class="slot b">
+      <div class="head">
+        <label><span class="title">🎥 Vidéo B</span><select id="sel1"><option>Charge tes vidéos…</option></select></label>
+        <label><span class="title">Offset s</span><input id="off1" type="number" step="0.05" value="0"></label>
+        <button id="mute1">🔇 Muet</button><button id="fs1" class="icon">⛶</button>
+      </div>
+      <div class="wrap" id="wrap1">
+        <video id="v1" playsinline preload="metadata" muted></video>
+        <div id="ph1" class="placeholder"><div><strong>Vidéo B</strong>Choisis une deuxième vidéo ou passe en mode 1 vidéo.</div></div>
+        <div id="badge1" class="badge">🕒 00:00:00.000</div>
+      </div>
+      <div class="foot"><div class="mini"><span id="mini1"></span></div><div class="meta"><span id="name1" class="name">Aucune vidéo</span><span id="time1">00:00:00.000 / 00:00:00.000</span></div></div>
+    </article>
+  </section>
+</main>
+
+<section class="dock">
+  <div class="clockrow">
+    <div class="clock"><span id="clock">00:00:00.000</span><small>Horloge maître</small></div>
+    <div><input id="bar" class="progress" type="range" min="0" max="1000" value="0"><div class="labels"><span>00:00:00.000</span><span id="dur">00:00:00.000</span></div></div>
+    <div id="drift" class="pill">0 ms</div>
+  </div>
+  <div class="controls">
+    <div class="left"><button id="m10">⏪ -10s</button><button id="m1">◀ -1s</button></div>
+    <div class="center"><button id="play" class="primary">▶️ <span class="txt">Lecture</span></button><button id="resync">🔄 <span class="txt">Resync</span></button><button id="goto">🎯 <span class="txt">Aller à</span></button></div>
+    <div class="right"><button id="p1">+1s ▶</button><button id="p10">+10s ⏩</button></div>
+  </div>
+</section>
+
+<dialog id="modal">
+  <div class="modalhead">
+    <div><h2>⚙️ Centre de synchronisation</h2><p>Horloge, onglets, décalages, vitesse et précision.</p></div>
+    <button id="close" class="icon">✕</button>
+  </div>
+  <div class="modalbody">
+    <div class="cards">
+      <section class="card">
+        <h3>🕒 Horloge maître</h3>
+        <label>Aller à un temps précis<input id="timeInput" value="01:15:45" placeholder="01:15:45 ou 1h15m45s"></label>
+        <div class="btngrid"><button id="applyTime" class="primary">🎯 Caler toutes</button><button id="resync2">🔄 Resync</button><button id="from0">Depuis vidéo A</button><button id="from1">Depuis vidéo B</button></div>
+        <p class="note">Formats : 01:15:45 · 1h15m45s · 4545 secondes.</p>
+      </section>
+
+      <section class="card">
+        <h3>🖥️ Multi-onglets</h3>
+        <div class="twocol">
+          <label>Salle<input id="room2" value="session-1"></label>
+          <label>Vitesse<select id="speed"><option value=".25">0.25x</option><option value=".5">0.5x</option><option value=".75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label>
+        </div>
+        <div class="btngrid"><button id="tabBtn2">🖥️ Ouvrir 2e onglet</button><button id="push">📡 Envoyer état</button></div>
+        <p id="tabid" class="note">Onglet : —</p>
+      </section>
+
+      <section class="card">
+        <h3>🧩 Affichage adaptatif</h3>
+        <label>Mode<select id="layout2"><option value="auto" selected>Auto adaptatif</option><option value="one">1 vidéo</option><option value="side">2 côte à côte</option><option value="stack">2 haut / bas</option></select></label>
+        <div class="btngrid">
+          <button id="modalToggleHeader" type="button">🏷️ Header</button>
+          <button id="modalToggleLoader" type="button">📁 Chargement</button>
+          <button id="modalToggleDock" type="button">🕒 Lecteur</button>
+          <button id="modalFocusMode" class="primary" type="button">🎬 Mode focus</button>
+        </div>
+        <p class="note">Auto = côte à côte sur grand écran, empilé si l’écran est trop étroit. Tu peux aussi masquer les éléments d’interface pour garder uniquement les vidéos.</p>
+      </section>
+
+      <section class="card">
+        <h3>🎯 Précision</h3>
+        <label>Correction si écart supérieur à<select id="limit"><option value=".03">30 ms</option><option value=".05">50 ms</option><option value=".1">100 ms</option><option value=".25" selected>250 ms — fluide</option><option value="999">Désactivée</option></select></label>
+        <p class="note">Si une vidéo dérive, elle est recalée sur l’horloge maître.</p>
+      </section>
+
+      <section class="card"><h3>🎥 Offset vidéo A</h3><label>Décalage secondes<input id="off0b" type="number" step="0.05" value="0"></label></section>
+      <section class="card"><h3>🎥 Offset vidéo B</h3><label>Décalage secondes<input id="off1b" type="number" step="0.05" value="0"></label></section>
+    </div>
+  </div>
+</dialog>
+
+
+<dialog id="helpModal">
+  <div class="modalhead">
+    <div>
+      <h2>❔ Aide & raccourcis clavier</h2>
+      <p>Les raccourcis agissent sur l’horloge maître et gardent les vidéos synchronisées.</p>
+    </div>
+    <button id="closeHelp" class="icon">✕</button>
+  </div>
+  <div class="modalbody">
+    <div class="cards">
+      <section class="card">
+        <h3>⌨️ Lecture & temps</h3>
+        <div class="help-list">
+          <div class="help-row"><div class="help-keys"><span class="key">Espace</span></div><div>Lecture / pause synchro.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">←</span><span class="key">→</span></div><div>Reculer / avancer de 1 seconde.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">Shift</span><span class="key">←</span><span class="key">→</span></div><div>Reculer / avancer de 10 secondes.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">R</span></div><div>Forcer une resynchronisation propre.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">H</span></div><div>Ouvrir / fermer cette aide.</div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>🎛️ Switch rapide vidéo</h3>
+        <div class="help-list">
+          <div class="help-row"><div class="help-keys"><span class="key">1</span><span class="key">2</span><span class="key">3</span>…</div><div>Envoyer la vidéo correspondante à gauche.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">Shift</span><span class="key">1</span><span class="key">2</span><span class="key">3</span>…</div><div>Envoyer la vidéo correspondante à droite.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">F</span></div><div>Activer / quitter le mode Focus.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">C</span></div><div>Afficher / masquer le panneau Charger, utile en Focus.</div></div>
+          <div class="help-row"><div class="help-keys"><span class="key">L</span></div><div>Afficher / masquer le lecteur horloge, utile en Focus.</div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>🧭 À retenir</h3>
+        <p class="note">Quand tu changes l’horloge maître ou une vidéo, l’application fait maintenant un recalage propre : pause interne très courte, seek, puis reprise contrôlée. Ça évite que les événements natifs de la vidéo recalculent l’horloge au mauvais moment.</p>
+      </section>
+
+      <section class="card">
+        <h3>⚡ Fluidité</h3>
+        <p class="note">Pour éviter les saccades, la correction douce reste utilisée pendant la lecture. Le recalage brutal est réservé aux actions importantes : changement de temps, changement de vidéo, resync, offset, switch gauche/droite.</p>
+      </section>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const tab=(crypto.randomUUID?crypto.randomUUID():Date.now()+Math.random()).slice(0,8);
+$("tabid").textContent="Onglet : "+tab;
+let files=[],chan=null,room="session-1",seen=[],applying=false,timer=null;
+let sync={t:0,wall:Date.now(),play:false,rate:1};
+let hardSyncToken=0;
+
+function suppress(sl,ms=900){sl.suppressUntil=Date.now()+ms}
+function suppressed(sl){return applying || (sl.suppressUntil && Date.now()<sl.suppressUntil)}
+
+
+const slots=[0,1].map(i=>({
+  i,v:$("v"+i),sel:$("sel"+i),off:$("off"+i),offb:$("off"+i+"b"),
+  name:$("name"+i),time:$("time"+i),mini:$("mini"+i),badge:$("badge"+i),
+  ph:$("ph"+i),wrap:$("wrap"+i),mute:$("mute"+i),muted:i===1
+}));
+
+function toast(x){$("toast").textContent=x;$("toast").classList.add("show");clearTimeout(timer);timer=setTimeout(()=>$("toast").classList.remove("show"),2300)}
+function fmt(x){if(!isFinite(x)||x<0)x=0;let ms=Math.floor((x%1)*1000),s=Math.floor(x)%60,m=Math.floor(x/60)%60,h=Math.floor(x/3600);return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(ms).padStart(3,"0")}`}
+function parseTime(s){s=String(s||"").trim().toLowerCase().replace(",",".");let m=s.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in)?)?\s*(?:(\d+(?:\.\d+)?)\s*s)?$/);if(m&&(m[1]||m[2]||m[3]))return +(m[1]||0)*3600+ +(m[2]||0)*60+ +(m[3]||0);if(s.includes(":")){let p=s.split(":").map(n=>parseFloat(n||0));if(p.length==3)return p[0]*3600+p[1]*60+p[2];if(p.length==2)return p[0]*60+p[1]}let n=parseFloat(s);return isFinite(n)?n:0}
+function master(){return sync.play?sync.t+(Date.now()-sync.wall)/1000*sync.rate:sync.t}
+function off(sl){return parseFloat(sl.off.value||0)||0}
+function local(sl,t=master()){let x=Math.max(0,t-off(sl)),d=sl.v.duration;return isFinite(d)&&d>0?Math.min(x,d):x}
+function maxDur(){return Math.max(0,...slots.map(s=>isFinite(s.v.duration)?s.v.duration:0))}
+function status(x,c="good"){$("status").textContent="🔄 "+x;$("status").className="pill "+c}
+function setSync(t,play=sync.play,send=true,reason="sync"){
+  sync.t=Math.max(0,+t||0);
+  sync.wall=Date.now();
+  sync.play=!!play;
+  sync.rate=parseFloat($("speed").value)||1;
+
+  const hardReasons=["sync","goto","jump","offset","bar","resync","from A","from B","click video","native seek","manual","speed"];
+  apply(hardReasons.includes(reason) || reason!=="tick");
+
+  if(send)broadcast("state",{t:sync.t,play:sync.play,rate:sync.rate,reason});
+  updatePlay();
+}
+
+function hardApply(){
+  const token=++hardSyncToken;
+  const shouldPlay=sync.play;
+  const targetGlobal=sync.t;
+
+  applying=true;
+
+  for(const sl of slots){
+    const v=sl.v;
+    if(!v.src)continue;
+
+    suppress(sl,1200);
+    try{v.pause()}catch(e){}
+    v.playbackRate=sync.rate;
+
+    if(v.readyState>=1){
+      const target=local(sl,targetGlobal);
+      try{v.currentTime=target}catch(e){}
+    }
+  }
+
+  setTimeout(()=>{
+    if(token!==hardSyncToken)return;
+
+    // On redémarre l’horloge exactement au moment où les vidéos repartent.
+    sync.wall=Date.now();
+
+    for(const sl of slots){
+      const v=sl.v;
+      if(!v.src)continue;
+
+      suppress(sl,700);
+      v.playbackRate=sync.rate;
+
+      if(shouldPlay){
+        v.play().catch(()=>status("Clique sur Lecture si autoplay bloqué","bad"));
+      }else{
+        try{v.pause()}catch(e){}
+      }
+    }
+
+    const grid=$("grid");
+    if(grid){
+      grid.classList.remove("sync-flash");
+      void grid.offsetWidth;
+      grid.classList.add("sync-flash");
+    }
+
+    setTimeout(()=>{if(token===hardSyncToken)applying=false},260);
+  },130);
+}
+
+function apply(hard=false){
+  if(hard){
+    hardApply();
+    return;
+  }
+
+  applying=true;
+  let mt=master();
+  let uiLimit=parseFloat($("limit").value)||.25;
+  let seekLimit=sync.play ? Math.max(uiLimit,.45) : uiLimit;
+
+  for(const sl of slots){
+    let v=sl.v;
+    if(!v.src)continue;
+
+    let target=local(sl,mt);
+
+    if(v.readyState>=1){
+      let delta=target-v.currentTime;
+      let abs=Math.abs(delta);
+
+      if(!sync.play || abs>seekLimit){
+        suppress(sl,500);
+        try{v.currentTime=target}catch(e){}
+        v.playbackRate=sync.rate;
+      }else{
+        // Correction douce pendant la lecture : pas de saut tant que la dérive est faible.
+        if(abs>.10){
+          let correction=Math.max(-.05,Math.min(.05,delta*.08));
+          v.playbackRate=Math.max(.25,Math.min(2.5,sync.rate+correction));
+        }else{
+          v.playbackRate=sync.rate;
+        }
+      }
+
+      if(sync.play){
+        if(v.paused)v.play().catch(()=>status("Clique sur Lecture si autoplay bloqué","bad"));
+      }else if(!v.paused){
+        v.pause();
+      }
+    }
+  }
+  setTimeout(()=>applying=false,140);
+}
+function broadcast(type,p={}){let msg={id:(crypto.randomUUID?crypto.randomUUID():Date.now()+Math.random()),sender:tab,room,type,wall:Date.now(),...p};try{if(chan)chan.postMessage(msg)}catch(e){}try{localStorage.setItem("syncview-"+room,JSON.stringify(msg))}catch(e){}}
+function receive(msg){
+  if(!msg||msg.room!==room||msg.sender===tab||seen.includes(msg.id))return;
+  seen.push(msg.id);
+  if(seen.length>120)seen=seen.slice(-60);
+
+  if(msg.type==="hello"){
+    status("Onglet connecté : "+msg.sender);
+    return;
+  }
+
+  if(msg.type==="state"){
+    let elapsed=msg.play?(Date.now()-msg.wall)/1000*(msg.rate||1):0;
+    sync.t=Math.max(0,(msg.t||0)+elapsed);
+    sync.wall=Date.now();
+    sync.play=!!msg.play;
+    sync.rate=msg.rate||1;
+    $("speed").value=String(sync.rate);
+
+    // Les ticks réguliers corrigent doucement. Les vraies actions utilisateur recalculent fort.
+    apply(msg.reason==="tick" ? false : true);
+    updatePlay();
+
+    if(msg.reason!=="tick") status("Synchro reçue");
+  }
+}
+function channel(){room=$("room").value.trim()||"session-1";$("room2").value=room;if(chan)try{chan.close()}catch(e){};if("BroadcastChannel" in window){chan=new BroadcastChannel("syncview-"+room);chan.onmessage=e=>receive(e.data)}status("Salle : "+room);broadcast("hello")}
+window.addEventListener("storage",e=>{if(e.key!=="syncview-"+room||!e.newValue)return;try{receive(JSON.parse(e.newValue))}catch(err){}});
+
+function renderSwitchPanel(){
+  const list=$("switchList");
+  if(!list)return;
+
+  list.innerHTML="";
+  if(!files.length){
+    list.innerHTML='<span class="switch-empty">Aucune vidéo chargée.</span>';
+    return;
+  }
+
+  files.forEach((f,i)=>{
+    const item=document.createElement("div");
+    item.className="switch-item";
+
+    const name=document.createElement("span");
+    name.className="switch-name";
+    name.title=f.name;
+    name.textContent=(i+1)+". "+f.name;
+
+    const left=document.createElement("button");
+    left.type="button";
+    left.textContent="⬅ Gauche";
+    left.onclick=()=>{
+      slots[0].sel.value=String(i);
+      load(slots[0]);
+      toast("Vidéo "+(i+1)+" envoyée à gauche");
+    };
+
+    const right=document.createElement("button");
+    right.type="button";
+    right.textContent="Droite ➡";
+    right.onclick=()=>{
+      slots[1].sel.value=String(i);
+      load(slots[1]);
+      toast("Vidéo "+(i+1)+" envoyée à droite");
+    };
+
+    item.append(name,left,right);
+    list.appendChild(item);
+  });
+}
+
+function populate(){
+  for(const sl of slots){
+    sl.sel.innerHTML="";
+    if(!files.length){
+      sl.sel.innerHTML="<option>Charge tes vidéos…</option>";
+      continue;
+    }
+    let none=new Option("Aucune vidéo","");
+    sl.sel.add(none);
+    files.forEach((f,i)=>sl.sel.add(new Option((i+1)+". "+f.name,String(i))));
+  }
+
+  if(files.length){
+    slots[0].sel.value="0";
+    slots[1].sel.value=files.length>1?"1":"0";
+  }
+
+  renderSwitchPanel();
+}
+function load(sl){
+  let f=files[parseInt(sl.sel.value,10)];
+
+  if(!f){
+    suppress(sl,500);
+    sl.v.removeAttribute("src");
+    sl.v.load();
+    sl.name.textContent="Aucune vidéo";
+    sl.ph.style.display="grid";
+    return;
+  }
+
+  // On fige l’horloge au moment du switch pour éviter un recalcul parasite.
+  sync.t=master();
+  sync.wall=Date.now();
+
+  applying=true;
+  suppress(sl,1800);
+
+  try{sl.v.pause()}catch(e){}
+  sl.v.src=f.url;
+  sl.v.muted=sl.muted;
+  sl.v.playbackRate=sync.rate;
+  sl.v.load();
+  sl.name.textContent=f.name;
+  sl.ph.style.display="none";
+
+  toast("Vidéo changée, recalage propre sur "+fmt(sync.t));
+}
+function updatePlay(){$("play").innerHTML=sync.play?'⏸️ <span class="txt">Pause</span>':'▶️ <span class="txt">Lecture</span>'}
+function layout(v){$("grid").className="grid "+v;$("layout").value=v;$("layout2").value=v;apply(true)}
+function openTab(){let u=new URL(location.href);u.hash="room="+encodeURIComponent(room);window.open(u.toString(),"_blank")}
+function setOff(sl,val){sl.off.value=val;sl.offb.value=val;setSync(master(),sync.play,true,"offset")}
+function jump(d){setSync(master()+d,sync.play,true,"jump")}
+
+$("files").onchange=()=>{files.forEach(f=>URL.revokeObjectURL(f.url));files=Array.from($("files").files||[]).map(file=>({name:file.name,url:URL.createObjectURL(file)}));populate();if(files.length){load(slots[0]);load(slots[1])}};
+for(const sl of slots){
+  sl.sel.onchange=()=>load(sl);
+
+  sl.v.onloadedmetadata=()=>{
+    applying=true;
+    suppress(sl,1800);
+
+    const target=local(sl,master());
+    try{sl.v.currentTime=target}catch(e){}
+
+    setTimeout(()=>{
+      suppress(sl,800);
+      sl.v.playbackRate=sync.rate;
+
+      if(sync.play){
+        sl.v.play().catch(()=>status("Clique sur Lecture si autoplay bloqué","bad"));
+      }else{
+        try{sl.v.pause()}catch(e){}
+      }
+
+      setTimeout(()=>applying=false,220);
+    },140);
+  };
+
+  sl.v.onclick=()=>setSync(master(),!sync.play,true,"click video");
+  sl.v.onplay=()=>{if(!suppressed(sl))setSync(sl.v.currentTime+off(sl),true,true,"native play")};
+  sl.v.onpause=()=>{if(!suppressed(sl))setSync(sl.v.currentTime+off(sl),false,true,"native pause")};
+  sl.v.onseeked=()=>{if(!suppressed(sl))setSync(sl.v.currentTime+off(sl),sync.play,true,"native seek")};
+  sl.off.onchange=()=>setOff(sl,sl.off.value);sl.offb.onchange=()=>setOff(sl,sl.offb.value);
+  sl.mute.onclick=()=>{sl.muted=!sl.muted;sl.v.muted=sl.muted;sl.mute.textContent=sl.muted?"🔇 Muet":"🔊 Son"};
+  sl.wrap.ondblclick=async()=>{try{if(!document.fullscreenElement)await sl.wrap.requestFullscreen();else await document.exitFullscreen()}catch(e){}};
+}
+$("fs0").onclick=()=>slots[0].wrap.requestFullscreen?.();$("fs1").onclick=()=>slots[1].wrap.requestFullscreen?.();
+$("layout").onchange=e=>layout(e.target.value);$("layout2").onchange=e=>layout(e.target.value);
+$("room").onchange=channel;$("room2").onchange=()=>{$("room").value=$("room2").value;channel()};
+$("tabBtn").onclick=openTab;$("tabBtn2").onclick=openTab;
+$("fullAppBtn").onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen()}catch(e){}};
+$("syncBtn").onclick=()=>$("modal").showModal();$("goto").onclick=()=>$("modal").showModal();$("close").onclick=()=>$("modal").close();
+if($("helpBtn"))$("helpBtn").onclick=()=>$("helpModal").showModal();
+if($("helpQuickBtn"))$("helpQuickBtn").onclick=()=>$("helpModal").showModal();
+if($("closeHelp"))$("closeHelp").onclick=()=>$("helpModal").close();
+$("play").onclick=()=>setSync(master(),!sync.play,true,sync.play?"pause":"play");
+$("resync").onclick=()=>{setSync(master(),sync.play,true,"resync");toast("Resync envoyée")};$("resync2").onclick=()=>$("resync").click();
+$("m10").onclick=()=>jump(-10);$("m1").onclick=()=>jump(-1);$("p1").onclick=()=>jump(1);$("p10").onclick=()=>jump(10);
+$("applyTime").onclick=()=>{let t=parseTime($("timeInput").value);setSync(t,sync.play,true,"goto");toast("Toutes les vidéos calées sur "+fmt(t))};
+$("from0").onclick=()=>setSync(slots[0].v.currentTime+off(slots[0]),sync.play,true,"from A");
+$("from1").onclick=()=>setSync(slots[1].v.currentTime+off(slots[1]),sync.play,true,"from B");
+$("push").onclick=()=>{broadcast("state",{t:master(),play:sync.play,rate:sync.rate,reason:"manual"});toast("État envoyé")};
+$("speed").onchange=()=>setSync(master(),sync.play,true,"speed");
+$("bar").oninput=()=>{let d=maxDur();if(d>0)setSync(parseInt($("bar").value,10)/1000*d,sync.play,false,"bar")};
+$("bar").onchange=()=>setSync(master(),sync.play,true,"bar");
+document.onkeydown=e=>{
+  let tag=document.activeElement?.tagName?.toLowerCase();
+  const typing=["input","select","textarea"].includes(tag);
+  const timeTyping=document.activeElement===$("timeInput");
+
+  if(e.key==="Escape"){
+    if($("helpModal")?.open)$("helpModal").close();
+    else if($("modal")?.open)$("modal").close();
+    return;
+  }
+
+  if(typing && !timeTyping)return;
+
+  if(e.code==="Space"){
+    e.preventDefault();
+    $("play").click();
+  }
+
+  if(e.key==="ArrowLeft"){
+    e.preventDefault();
+    jump(e.shiftKey?-10:-1);
+  }
+
+  if(e.key==="ArrowRight"){
+    e.preventDefault();
+    jump(e.shiftKey?10:1);
+  }
+
+  if(e.key.toLowerCase()==="r"){
+    e.preventDefault();
+    $("resync").click();
+  }
+
+  if(e.key.toLowerCase()==="h"){
+    e.preventDefault();
+    if($("helpModal").open)$("helpModal").close();
+    else $("helpModal").showModal();
+  }
+
+  if(e.key.toLowerCase()==="f"){
+    e.preventDefault();
+    if(typeof toggleFocus==="function")toggleFocus();
+  }
+
+  if(e.key.toLowerCase()==="c"){
+    e.preventDefault();
+    if(typeof toggleLoaderSmart==="function")toggleLoaderSmart();
+  }
+
+  if(e.key.toLowerCase()==="l"){
+    e.preventDefault();
+    if(typeof toggleDockSmart==="function")toggleDockSmart();
+  }
+
+  if(/^[1-9]$/.test(e.key)){
+    const idx=parseInt(e.key,10)-1;
+    if(files[idx]){
+      const targetSlot=e.shiftKey?slots[1]:slots[0];
+      targetSlot.sel.value=String(idx);
+      load(targetSlot);
+      toast("Vidéo "+(idx+1)+" → "+(e.shiftKey?"droite":"gauche"));
+    }
+  }
+
+  if(e.key==="Enter"&&timeTyping)$("applyTime").click();
+};
+
+function ui(){let mt=master(),d=maxDur(),p=d?Math.max(0,Math.min(100,mt/d*100)):0;$("clock").textContent=fmt(mt);$("dur").textContent=fmt(d);$("bar").style.setProperty("--p",p+"%");if(!$("bar").matches(":active"))$("bar").value=Math.round(p*10);let maxdiff=0;for(const sl of slots){let v=sl.v,vd=isFinite(v.duration)?v.duration:0,t=isFinite(v.currentTime)?v.currentTime:0;sl.time.textContent=fmt(t)+" / "+fmt(vd);sl.badge.textContent="🕒 "+fmt(t);sl.mini.style.width=vd?Math.min(100,t/vd*100)+"%":"0%";if(v.src&&v.readyState>=1)maxdiff=Math.max(maxdiff,Math.abs(t-local(sl,mt)))}$("drift").textContent=Math.round(maxdiff*1000)+" ms";$("drift").className=maxdiff>parseFloat($("limit").value)?"pill bad":"pill";requestAnimationFrame(ui)}
+setInterval(()=>{if(sync.play&&!applying){apply(false);broadcast("state",{t:master(),play:true,rate:sync.rate,reason:"tick"})}},900);
+
+function setUiButtonStates(){
+  const b=document.body;
+  const headerHidden=b.classList.contains("hide-header") || b.classList.contains("focus-mode");
+  const loaderHidden=b.classList.contains("hide-loader") || b.classList.contains("focus-mode");
+  const dockHidden=b.classList.contains("hide-dock") || b.classList.contains("focus-mode");
+  if($("toggleHeader")) $("toggleHeader").innerHTML=headerHidden?'🏷️ <span class="wide-label">Header masqué</span>':'🏷️ <span class="wide-label">Header</span>';
+  if($("toggleLoader")) $("toggleLoader").innerHTML=loaderHidden?'📁 <span class="wide-label">Chargement masqué</span>':'📁 <span class="wide-label">Charger</span>';
+  if($("toggleDock")) $("toggleDock").innerHTML=dockHidden?'🕒 <span class="wide-label">Lecteur masqué</span>':'🕒 <span class="wide-label">Lecteur</span>';
+  if($("focusMode")) $("focusMode").innerHTML=b.classList.contains("focus-mode")?'↩️ <span class="wide-label">Quitter focus</span>':'🎬 <span class="wide-label">Focus</span>';
+}
+function saveUiState(){
+  localStorage.setItem("syncview-ui", document.body.className);
+  setUiButtonStates();
+}
+function toggleClassAndSave(cls){
+  document.body.classList.toggle(cls);
+  saveUiState();
+}
+function toggleFocus(){
+  document.body.classList.toggle("focus-mode");
+  saveUiState();
+}
+function restoreUiState(){
+  const saved=localStorage.getItem("syncview-ui");
+  if(saved) document.body.className=saved;
+  setUiButtonStates();
+}
+if($("toggleHeader")) $("toggleHeader").onclick=()=>toggleClassAndSave("hide-header");
+if($("toggleLoader")) $("toggleLoader").onclick=()=>toggleClassAndSave("hide-loader");
+if($("toggleDock")) $("toggleDock").onclick=()=>toggleClassAndSave("hide-dock");
+if($("focusMode")) $("focusMode").onclick=toggleFocus;
+if($("modalToggleHeader")) $("modalToggleHeader").onclick=()=>toggleClassAndSave("hide-header");
+if($("modalToggleLoader")) $("modalToggleLoader").onclick=()=>toggleClassAndSave("hide-loader");
+if($("modalToggleDock")) $("modalToggleDock").onclick=()=>toggleClassAndSave("hide-dock");
+if($("modalFocusMode")) $("modalFocusMode").onclick=toggleFocus;
+
+
+/* Focus v2 : en focus, Charger/Lecteur s'ouvrent comme panneaux temporaires */
+function setUiButtonStates(){
+  const b=document.body;
+  const inFocus=b.classList.contains("focus-mode");
+  const headerHidden=b.classList.contains("hide-header") || inFocus;
+  const loaderVisibleInFocus=inFocus && b.classList.contains("focus-show-loader");
+  const dockVisibleInFocus=inFocus && b.classList.contains("focus-show-dock");
+  const loaderHidden=inFocus ? !loaderVisibleInFocus : b.classList.contains("hide-loader");
+  const dockHidden=inFocus ? !dockVisibleInFocus : b.classList.contains("hide-dock");
+
+  if($("toggleHeader")) $("toggleHeader").innerHTML=headerHidden?'🏷️ <span class="wide-label">Header masqué</span>':'🏷️ <span class="wide-label">Header</span>';
+  if($("toggleLoader")) $("toggleLoader").innerHTML=loaderHidden?'📁 <span class="wide-label">Afficher charger</span>':'📁 <span class="wide-label">Masquer charger</span>';
+  if($("toggleDock")) $("toggleDock").innerHTML=dockHidden?'🕒 <span class="wide-label">Afficher lecteur</span>':'🕒 <span class="wide-label">Masquer lecteur</span>';
+  if($("focusMode")) $("focusMode").innerHTML=inFocus?'↩️ <span class="wide-label">Quitter focus</span>':'🎬 <span class="wide-label">Focus</span>';
+}
+function toggleLoaderSmart(){
+  if(document.body.classList.contains("focus-mode")){
+    document.body.classList.toggle("focus-show-loader");
+    localStorage.setItem("syncview-ui", document.body.className);
+    setUiButtonStates();
+  }else{
+    toggleClassAndSave("hide-loader");
+  }
+}
+function toggleDockSmart(){
+  if(document.body.classList.contains("focus-mode")){
+    document.body.classList.toggle("focus-show-dock");
+    localStorage.setItem("syncview-ui", document.body.className);
+    setUiButtonStates();
+  }else{
+    toggleClassAndSave("hide-dock");
+  }
+}
+function toggleFocus(){
+  document.body.classList.toggle("focus-mode");
+  if(!document.body.classList.contains("focus-mode")){
+    document.body.classList.remove("focus-show-loader","focus-show-dock");
+  }
+  localStorage.setItem("syncview-ui", document.body.className);
+  setUiButtonStates();
+}
+if($("toggleLoader")) $("toggleLoader").onclick=toggleLoaderSmart;
+if($("toggleDock")) $("toggleDock").onclick=toggleDockSmart;
+if($("focusMode")) $("focusMode").onclick=toggleFocus;
+if($("modalToggleLoader")) $("modalToggleLoader").onclick=toggleLoaderSmart;
+if($("modalToggleDock")) $("modalToggleDock").onclick=toggleDockSmart;
+if($("modalFocusMode")) $("modalFocusMode").onclick=toggleFocus;
+
+let h=new URLSearchParams(location.hash.replace(/^#/,""));if(h.get("room"))$("room").value=h.get("room");
+channel();layout("auto");restoreUiState();updatePlay();ui();
+</script>
+</body>
+</html>
